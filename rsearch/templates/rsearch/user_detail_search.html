@@ -1,0 +1,54 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+
+<title>{% block title %}Searched Details{% endblock %}</title>
+</head>
+
+<body>
+  <div id="content">
+    {% block content %}
+    <table border="1">
+
+      {% if finalQuerySet.0.user == None  %}
+        <tr>
+          <th>Name</th><th>Phone</th><th>email</th><th>Company</th><th>College</th>
+        </tr>
+        {% for query in finalQuerySet %}
+          <tr>
+            <td>{{query.name}}</td><td>{{query.phone}}</td><td>{{query.email}}</td><td>{% for comp in query.company.all%} {{comp.companyName}}{%endfor%}</td><td>{% for coll in query.college.all%} {{coll.collegeName}}{%endfor%}</td>
+          </tr>
+        {% endfor %}
+      {% else %}
+          <tr>
+            <th>Name</th><th>Phone</th><th>email</th><th>Company</th><th>College</th><th>Degree</th><th>Year</th>
+          </tr>
+          {% for query in finalQuerySet %}
+            <tr>
+              <td>{{query.user.name}}</td><td>{{query.user.phone}}</td><td>{{query.user.email}}</td><td>{% for comp in query.user.company.all%} {{comp.companyName}}{%endfor%}</td><td>{% for coll in query.user.college.all%} {{coll.collegeName}}{%endfor%}</td><td>{{query.userDegree}}</td><td>{{query.userDegreeYear}}</td>
+            </tr>
+          {% endfor %}
+
+
+
+      {% endif %}
+
+    {% endblock %}
+
+
+    </table>
+
+
+
+
+  </div>
+
+  <div id="footer">
+    {% block footer %}{% endblock %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<title>{% block title %}Resume Parser{% endblock %}</title>
+<style >
+  #t1{
+    text-align: center;
+  }
+  #upload{
+    top: 6vh;
+    /* position: absolute; */
+  }
+
+  #uploadRedirect {
+      background: #f9f9f9;
+      border: 5px solid #88c;
+      padding: 15px;
+      border-radius: 5px;
+      /* margin: 10px; */
+      cursor: pointer;
+  }
+  #apply {
+      /* background: gray; */
+      border: 2px solid black;
+      padding: 9px;
+      border-radius: 5px;
+      /* margin: 10px; */
+      cursor: pointer;
+  }
+.right {
+  margin-left: 1000px;
+}
+</style>
+
+
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+</head>
+
+<body bgcolor="#D3D3D3">
+ <h2 id='t1'> Filter Candidates and Upload Resume</h2>
+
+<div id="filters">
+  {% block filters %}<h3>Apply Filters:</h3>
+  <h3>Personal Details<h3/>
+  <h4> Name <input type="text" id="userNameF" ></h4>
+  <h4> Phone <input type="text" id="phoneF" ></h4>
+  <h4> Email <input type="text" id="emailF" ></h4>
+  <br/>
+  <br/>
+  <h3>Education</h3>
+  <h4> College<input type="text" id="collegeF" ></h4>
+  <h4> Degree<input type="text" id="degreeF" ></h4>
+  <h4> Year of Passing<input type="text" id="gradYearF" ></h4>
+  <br/>
+  <br/>
+  <h3>Experience</h3>
+  <h4> Company<input type="text" id="companyF" ></h4>
+  <!-- number of years of experience -->
+
+  <button type="button" name="button" id="apply" onlclick=getUserDetails() >Apply</button>
+
+  {% endblock %}
+</div>
+
+<!-- <input type="button" id="get_file" value="Choose file" class="right"> -->
+<br/>
+<br/>
+<br/>
+
+  <button id="uploadRedirect">Click here to upload resume Zip File</button>
+
+
+
+<!-- <ul><li><a href="/user_detail_search">Home</a></li></ul> -->
+
+<script>
+  // function getUserDetails(){
+  //   uName = document.getElementById('userNameF').value;
+  //   colName = document.getElementById('collegeF').value;
+  //   compName = document.getElementById('companyF').value;
+  // }
+
+
+  $('#apply').click(function(){
+    var user_name = "NA";
+    var college_name = "NA";
+    var company_name = "NA";
+    user_name = $('#userNameF')[0].value;
+    phone = $('#phoneF')[0].value;
+    email = $('#emailF')[0].value;
+
+    college_name = $('#collegeF')[0].value;
+    degree_name = $('#degreeF')[0].value;
+    grad_year=$('#gradYearF')[0].value;
+
+
+    company_name = $('#companyF')[0].value;
+
+    if (!user_name) user_name = "NA";
+    if (!phone) phone = "NA";
+    if (!email) email = "NA";
+
+    if (!college_name) college_name = "NA";
+    if (!degree_name) degree_name = "NA";
+    if (!grad_year) grad_year = "NA";
+
+    if (!company_name) company_name = "NA";
+
+
+
+
+    console.log("userName"+user_name+"col"+college_name);
+    window.location.href = "/user_detail_search/"+user_name+"/"+phone+"/"+email+"/"+college_name+"/"+degree_name+"/"+grad_year+"/"+company_name
+  });
+
+  $('#uploadRedirect').click(function(){
+
+    window.location.href = "/uploaded"
+  });
+</script>
+
+
+</body>
+
+
+
+</html>
