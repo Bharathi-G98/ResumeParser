@@ -20,6 +20,7 @@ from tika import parser
 import zipfile
 #from nltk.tag import StanfordNERTagger
 from nltk.tokenize import word_tokenize,sent_tokenize
+import mysql.connector
 
 #stanford_classifier = 'C:\\Users\\Lenovo\\stanford-ner-2018-10-16\\classifiers\\english.all.3class.distsim.crf.ser.gz'
 #stanford_ner_path = 'C:\\Users\\Lenovo\\stanford-ner-2018-10-16\\stanford-ner.jar'
@@ -27,7 +28,7 @@ from nltk.tokenize import word_tokenize,sent_tokenize
 short_month={'Jan':'January','Feb':'February','Mar':'March','Apr':'April','May':'May','Jun':'June','Jul':'July','Aug':'August','Sep':'September','Sept':'September','Oct':'October','Nov':'November','Dec':'December'}
 pos_head=['CAREER OBJECTIVE','TECHNICAL SKILLS','ACADEMIC ACHIEVEMENTS','WORK EXPERIENCE','EXPERIENCE SUMMARY','PROJECT DETAILS','PROJECT EXPERIENCE','ADDITIONAL ACTIVITIES',
                   'PROFESSIONAL EXPERIENCE','ACADEMIC DISTINCTIONS','PROFESSIONAL SUMMARY', 'PROJECT PROFILE','TOOLS AND APPLICATIONS','ONLINE COURSES','TECHNICAL PROFICIENCY',
-                  'CAREER SUMMARY','ADDITIONAL ENGAGEMENTS','ACADEMIC PROJECTS','ADDITIONAL ACTIVITIES'
+                  'CAREER SUMMARY','ADDITIONAL ENGAGEMENTS','ACADEMIC PROJECTS','ADDITIONAL ACTIVITIES','WORK HISTORY',
                   'PUBLIC PROFILES','OTHER PROJECTS TRAININGS UNDERTAKEN','PROJECT DETAILS',
                   'FIELDS OF INTEREST','AREAS OF INTEREST','TECHNICAL EXPERIENCE','TECHNOLOGIES WORKED','LANGUAGES KNOWN',
                   'PROJECT WORK','PROFESSIONAL PROFILE','MINI PROJECTS','COMMUNICATION SKILLS','WORKING EXPERIENCE',
@@ -35,12 +36,13 @@ pos_head=['CAREER OBJECTIVE','TECHNICAL SKILLS','ACADEMIC ACHIEVEMENTS','WORK EX
                   'ABSTRACT','DECLARATION','EMPLOYMENT','PROJECTS','JOBS','JOB',
                  'CERTIFICATIONS','REFERENCE','LICENSES','CONFERENCES','TALKS','HONORS',
                   'AWARDS','INTERESTS','COURSES','HONORS','PUBLICATIONS','PUBLISHED','SCHOLARSHIPS','PERSONAL','OBJECTIVES',
-                  'OBJECTIVE','REFERENCES',
-                  'QUALITIES','LINKS','SOCIETIES','EXTRACURRICULAR','EXTRA-CURRICULAR',
+                  'OBJECTIVE','REFERENCES','PUBLICATIONS',
+                  'QUALITIES','LINKS','SOCIETIES','EXTRACURRICULAR','EXTRA-CURRICULAR','SUMMER INTERNSHIP/WORK EXPERIENCE',
                   'COMPETANCY','REFERENCE','ASPIRATION',
                   'APPENDIX','ACCOMPLISHMENTS','EXPERTISE','HOBBIES']
 Indian_states=["Andhra Pradesh","Arunachal Pradesh ","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli","Daman and Diu","Lakshadweep","National Capital Territory of Delhi","Puducherry"]
 def extract_name(resume,e):
+    #print(text)
     name=''
     sent=[]
     person=[]
@@ -95,7 +97,7 @@ def extract_name(resume,e):
                                             break
                                     '''
                                     person.append(text2)
-                                    if text3[text3.index(text2)+1]=="\n":
+                                    if text3[text3.lower().index(text2.lower())+1]=="\n":
                                      break
                     #person.append(i[0] for i in classified_text if i[1]=='PERSON')
 
@@ -175,7 +177,7 @@ def time(t):
                     if count==8:
                         count=0
                     time_periods[p.lower().rfind('till date')]='Till Date'
-                elif i.lower()==('present'):
+                elif i.lower()==('present') or i.lower()==('current'):
                     count+=1
                     if count==8:
                         count=0
@@ -195,6 +197,66 @@ def time(t):
                 else:
                     continue
             return time_periods,p
+def extract_companies_and_year(text,time_periods):
+            dat=pd.read_csv("/home/goscale/Downloads/companies.csv")
+            text2=text.replace('.','')
+            text2=text2.replace('\n','')
+            k=text2.lower()
+            #for short forms
+            col=list(dat.columns.values)
+            col_list={}
+            for i in col:
+                if i.lower() in k:
+                    ind=k.index(i.lower())
+                    for m in re.finditer(i.lower(), k):
+                        if m:
+                            if not(k[m.start()-1].isalpha())and not(k[m.end()].isalpha()):
+                                #checking if inside word
+                                col_list[k.index(i.lower())]=i
+                                break
+            col_key=list(col_list.keys())
+            if col_key:
+            #logic: usually college is written first. therefore, yera-year or month year-month year can be written for college.
+            #if the duration is afterwards: acees the next 2 time periods: (month year-month year) or (year to year)
+                time2=""
+                orig_time_val=time_periods.values()
+                time_pd={}
+                for k in orig_time_val:
+                    for m in re.finditer(k,text2):
+                        time_pd[m.start()]=m[0]
+
+                time_pd=OrderedDict(sorted(time_pd.items()))
+                time_key=list(time_pd.keys())
+                #case 1: if college is listed first and time period is before college
+                v=''
+                if time_key:
+                    if time_key[0]<(col_key[0]):
+                        #till_key= max(k for k in time_key if k<=col_key[0])
+                        for i in time_key:
+                            v=''
+                            if i<col_key[0]:
+                                if time_pd[i].isdigit():
+                                    v=' to '
+                                time2+=time_pd[i]+' '+v
+                        time2=time2[:-3]
+                    #case 2: college listed first and time pd is after it
+                    v=''
+                    c=0
+                    if time2=="":
+                        for i in time_key:
+                            v=''
+                            if c==2:
+                                break
+                            if time_pd[i].isdigit():
+                                c+=1
+                                v=' to '
+                            time2+=time_pd[i]+' '+v
+                        time2=time2[:-3]
+                    return col_list.values(),time2
+                else:
+                    return list(col_list.values()),['none']
+            else:
+                return ["none"],["none"]
 def extract_college_and_year(text,time_periods):
             dat=pd.read_csv("/home/goscale/Downloads/colleges.csv")
             text2=text.replace('.','')
@@ -398,7 +460,7 @@ def exp(text,headings):
             if '\nACHIEVEMENTS' in temp:
                 headings[t.index('ACHIEVEMENTS')]='ACHIEVEMENTS'
             for i,j in headings.items():
-                if 'EMPLOYMENT'==j or 'WORK EXPERIENCE'==j or 'CAREER SUMMARY'==j or 'EXPERIENCE SUMMARY'==j or 'PROFESSIONAL PROFILE'==j or 'PROFESSIONAL EXPERIENCE'==j or 'ORGANIZATIONAL'==j or 'ORGANISATIONAL'==j or 'JOB'==j or 'JOBS'==j or 'WORKING EXPERIENCE'==j:
+                if 'EMPLOYMENT'==j or 'WORK EXPERIENCE' in j or 'CAREER SUMMARY'==j or 'EXPERIENCE SUMMARY'==j or 'PROFESSIONAL PROFILE'==j or 'PROFESSIONAL EXPERIENCE'==j or 'ORGANIZATIONAL'==j or 'ORGANISATIONAL'==j or 'JOB'==j or 'JOBS'==j or 'WORKING EXPERIENCE'==j or j=="WORK HISTORY":
                         headI=i
                         beg=headI
                         break
@@ -420,14 +482,16 @@ def exp(text,headings):
                     if m and not(temp[m.end()].isalpha()):
                         inde=m.start()
                         for i in k:
-                            if headings[i] in temp and (temp.index(headings[i]))> m.end():
-
-                                end=temp.index(headings[i])
+                            if headings[i] in temp and i> m.end():
+                                end=i
                                 break
                         if end==99999:
                             end=len(temp)
                         edu=tempor[inde:end]
+                        #print(edu)
                         edu=edu.replace("\n"," ")
+                        if edu:
+                            break
             if(inde):
                 headings2[inde]="EXPERIENCE"
                 headings2=OrderedDict(sorted(headings2.items()))
@@ -438,19 +502,20 @@ def exp(text,headings):
                         for i in k:
                             inde=m.start()
                             if headings[i] in temp and (temp.index(headings[i]))> m.end():
-
-                                end=temp.index(headings[i])
+                                end=i
                                 break
                         if end==99999:
                             end=len(temp)
                         edu=tempor[inde:end]
                         edu=edu.replace("\n"," ")
-                        break
+                        if edu:
+                            break
             if(inde):
                 headings2[inde]="EXPERIENCE"
                 headings2=OrderedDict(sorted(headings2.items()))
             if(edu):
-                return edu		
+                return edu
+'''		
 def find_companies(w):
             dat=pd.read_csv("/home/goscale/Downloads/companies.csv")
             text2=w
@@ -466,8 +531,35 @@ def find_companies(w):
                     if not(text3[ind-1].isalpha())and not(text3[ind+len(i.lower())].isalpha()):
                         #checking if inside word
                         col_list[text3.index(i.lower())]=i
-            comp=list(col_list.values())
-            return comp	
+            return col_list	
+'''            
+def find_companies(w):
+            #print(w)
+            conn = mysql.connector.connect(user='root', password='root', host='127.0.0.1', database='resumeParser')
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM companies")
+            result = cur.fetchall()
+            col=[i[0] for i in result]
+            conn.close()
+            text2=w
+            #text2=text2.replace('.','')
+            #text2=text2.replace('-','')
+            text3=text2.lower()
+            col=[i.replace(",",'') for i in col]
+            col=[i.replace("-",' ') for i in col]
+            '''
+            dat=pd.read_csv("/home/goscale/Downloads/companies.csv")
+            col=list(dat.columns.values)
+            '''
+            col_list={}
+            for i in col:
+                for m in re.finditer(i.lower(), text3):
+                    if not(text3[m.start()-1].isalpha())and not(text3[m.start()+len(i.lower())].isalpha()) and i.lower() != 'c':
+                        #checking if inside word
+                        col_list[m.start()]=i
+            return col_list	
+            
+            
 def get_degree(text):
             degrees={}
             fname="/home/goscale/Downloads/degrees.docx"
@@ -487,12 +579,18 @@ def get_degree(text):
                         deg.append(word)
                     word=""
             deg.append('Twelfth')
+            deg=[i.replace('\t','') for i in deg]
             text=text.replace('.','')
             text2=text.upper()
             for i in deg:
-                i=i.replace('\t','')
                 for m in re.finditer(i.upper(), text2):
-                     if not(text[m.start()-1].isalnum()) and not(text[m.end()].isalnum()):
+                     flag1=False
+                     flag2=False
+                     if m.start() ==0 or not(text[m.start()-1].isalnum()):
+                         flag1=True
+                     if m.end()==len(text) or not(text[m.end()].isalnum()):
+                         flag2=True
+                     if flag1 and flag2:
                              a=1
                              #print(i)
                              degrees=OrderedDict(sorted(degrees.items()))
@@ -512,6 +610,7 @@ def get_degree(text):
                                      a=0
                              if(a):
                                  degrees[m.start()]=i
+            degrees=dict((k, v) for k, v in degrees.items() if v)
             degrees=OrderedDict(sorted(degrees.items()))
             return degrees
 def locations(w):
@@ -547,26 +646,31 @@ def locations(w):
             return allPlace		
 def designation(w):
             finder=FinderAcora()
-            job=finder.findall(w)
             jobTitles={}
-            count=0
-            d=""
-            for i in job:
-                u=i[2]
-                ind=w.index(u)+len(u)
-                if(w[ind]==" "):
-                    #print(u)
-                    d+=u+" "
-                    count+=1
-                    if count==8:
-                            count=0
-                    jobTitles[d.rfind(u)]=u
+            try:
+             job=finder.findall(w)
+             d=""
+             for i in job:
+                    jobTitles[i.start]=i.match
 
-            for m in re.finditer('SDE', w):
+             for m in re.finditer('SDE', w):
                     count+=1
                     if count==8:
                         count=0
                     jobTitles[m.start()]='SDE'
+             for m in re.finditer('freelancer', w.lower()):
+                    count+=1
+                    if count==8:
+                        count=0
+                    jobTitles[m.start()]='Freelancer'
+            except:
+                pass
+            if not jobTitles:
+                j=['developer','engineer','intern']
+                for i in j:
+                 for m in re.finditer(" "+i+" ", w.lower()):
+                    jobTitles[m.start()]=i.capitalize()
+                
             return jobTitles
 def deg_with_year(degr,time_periods):
             degAndYear={}
@@ -646,7 +750,77 @@ def monthYear(text):
                 text=text.replace(t,t2)
             return text	
             
-def getWorkDetails(text,headings):
+def getWorkDetails(w,companies,desig,time_periods,text,headings):
+ #in w: usually, we have comp_name : duration and designation. might or might not have projects. 
+ #fetch 1st occurnace of all companies. from ind to next ind, fetch designation, dur, skills. if skills empty, look for those skills wrt those names under Projects heading.
+ #print(w)
+ 
+ #res: list of [company,[designation],time periods,{skill:skill_count}]
+ #time_periods,w=time(w)
+ print(w)
+ tp_keys = list(time_periods.keys())
+ tp_keys.sort()
+ if companies:
+  comp_keys = list(companies.keys())
+  comp_keys.append(len(w))
+  comp_keys.sort()
+  desig_keys = list(desig.keys())
+  desig_keys.append(len(w))
+  desig_keys.sort()
+  res = []
+  if desig and min(desig_keys) < min(comp_keys):
+   for k in desig_keys:
+    if desig_keys.index(k) == len(desig_keys)-1:
+     break   
+    r=[]
+    t = w[k:desig_keys[desig_keys.index(k)+1]]
+    co=[]
+    dur=""
+    for c in comp_keys:
+     if c > k and c < desig_keys[desig_keys.index(k)+1]:
+      co.append(companies[c])
+    r.append(co)
+    r.append(desig[k])
+    for tp in tp_keys:
+     if tp > k and tp < desig_keys[desig_keys.index(k)+1]: 
+       dur+=" "+time_periods[tp]
+       if len(time_periods[tp])==4 and time_periods[tp].isdigit():
+        dur+=" - "
+    if dur:
+     if dur[-2:]=="- ":
+         dur=dur[:-2]
+    r.append(dur)
+    sk,sk_count=extract_skills(t)
+    r.append(sk_count)
+    res.append(r)
+  else:
+   for k in comp_keys:
+    if comp_keys.index(k) == len(comp_keys)-1:
+     break   
+    r=[]
+    t = w[k:comp_keys[comp_keys.index(k)+1]]
+    co=[]
+    r.append(companies[k])
+    dur=""
+    if desig:
+     for c in desig_keys:
+      if c > k and c < comp_keys[comp_keys.index(k)+1]:
+       co.append(desig[c])
+    r.append(co)
+    for tp in tp_keys:
+     if tp > k and tp < comp_keys[comp_keys.index(k)+1]: 
+       dur+=" "+time_periods[tp]
+       if len(time_periods[tp])==4 and time_periods[tp].isdigit():
+        dur+=" - "
+    if dur:
+     if dur[-2:]=="- ":
+         dur=dur[:-2]
+    r.append(dur)
+    sk,sk_count=extract_skills(t)
+    r.append(sk_count)
+    res.append(r)
+  return res
+     
  val = list(headings.values())
  key = list(headings.keys())
  if "PROJECTS" in val:
@@ -654,7 +828,20 @@ def getWorkDetails(text,headings):
   begin = key[v]
   end = key[v+1]
   workDetails = text[begin:end]
-  return workDetails
+  companies=find_companies(w)
+  if companies:
+   comp_keys = list(companies.keys())
+   comp_keys.append(len(workDetails))
+   comp_keys.sort()
+   for c in comp_keys:
+    if comp_keys.index(c) == len(comp_keys)-1:
+     break
+    t = workDetails[c:comp_keys[comp_keys.index(c)+1]]
+    sk,sk_count=extract_skills(t)
+
+
+  #return workDetails
+  
             
 #############################START##################################	
 global tempor
@@ -663,16 +850,16 @@ headings2={}
 places={}
 text=''
 
-fpath='/home/goscale/Desktop/VIDocs/BharathiResume_Dec20v1.pdf'
+fpath='/home/goscale/resumes/Matej Cica-resumerd8i0C.pdf'
 
 raw = parser.from_file(fpath)
 
 text=raw['content']
-
 text=removeEnc(text)
 text=text.replace('('," ")
 text=text.replace(')'," ")
-text=text.replace('  ',' ')
+text=re.sub(' +', ' ', text)
+text = text.replace('\n ','\n')
 text=text.replace('\t',' ')
 text=text.replace(' Linkedin ',' LinkedIn ')	
 propernoun=[]
@@ -689,8 +876,7 @@ tempor=text
 text=monthYear(text)
 tempor=monthYear(tempor)
 headings2=head(text)
-print("headingssss")
-print(text[3299:3500])
+
 #for repetition of important text in document
 textf=''
 text3=text.split()
@@ -720,11 +906,8 @@ sk,sk_count=extract_skills(text)
 namePdf=extract_name(text,e)
 #namePdf=""
 ph=extract_phoneNum(text)
-
-workDetails = getWorkDetails(text,headings2)
-print("WORK DETAILSSSSS")
-print(workDetails)
-print("AFTER WORK DETAILSSSSS")
+print("Headingsssss")
+print(headings2)
 
 w=exp(text,headings2)
 if(w):
@@ -733,7 +916,20 @@ if(w):
  w=w.replace('—',' ')
  w=removeEnc(w)
  w=monthYear(w)
-
+workDetails=""
+if w:
+ textr= "".join(text.rsplit(w))
+ time_periods,textr=time(w)
+ companies=find_companies(textr)
+ print("companies")
+ print(companies)
+ col,prd=extract_companies_and_year(textr,time_periods)
+ desig = designation(textr)
+ workDetails = getWorkDetails(w,companies,desig,time_periods,text,headings2)
+ print(workDetails)
+else:
+ companies=find_companies(text)
+#print(text)
 educat=education(text,headings2)
 if (educat):
  educat2=educat.replace('.','')
@@ -741,6 +937,8 @@ if (educat):
  educat2=educat2.replace(' X ',' Tenth ')
  educat2=educat2.replace(' 10th ',' Tenth ')
  educat2=educat2.replace(' 10 ',' Tenth ')
+ educat2=educat2.replace('Matriculation',' Tenth ')
+ educat2=educat2.replace('Intermediate','Twelfth')
  educat2=educat2.replace('XII','Twelfth')
  educat2=educat2.replace('12th','Twelfth')
  educat2=educat2.replace(' 12 ','Twelfth')
@@ -761,6 +959,7 @@ else:
 
  col,prd=extract_college_and_year(educat,time_periods)
  degr=get_degree(educat)
+ print('in else')
  degr_val=list(degr.values())
  degr_key=list(degr.keys())
  degr_val=[i.lower() for i in degr_val]
@@ -775,10 +974,6 @@ else:
      k=degr_key[i]
      del degr[k]
 
-if w:
- companies=find_companies(w)
-else:
- companies=find_companies(text)
 
 if not(degr):
  textt=text.replace('.','')
@@ -814,7 +1009,9 @@ for k,j in deg_year.items():
   u=l[:(t_y[1]+1)]
   u=' '.join(u)
   deg_year[k]=u	
-det=[namePdf,e,ph,deg_year,w,col]
+if not workDetails:
+    workDetails=w
+det=[namePdf,e,ph,deg_year,workDetails,col]
 print('DETAILS')
 for i in det:
  print(i)
